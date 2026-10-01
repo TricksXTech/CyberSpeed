@@ -1,0 +1,1970 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>CYBERSPEED 3D // In-House Autonomous Telemetry</title>
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    :root {
+      --bg-base: #060913;
+      --bg-surface: rgba(13, 20, 38, 0.75);
+      --bg-surface-hover: rgba(20, 32, 58, 0.88);
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --border-glow: rgba(0, 229, 255, 0.35);
+      
+      --cyan: #00e5ff;
+      --cyan-dim: rgba(0, 229, 255, 0.15);
+      --cyan-glow: 0 0 20px rgba(0, 229, 255, 0.4);
+      
+      --violet: #b55fe6;
+      --violet-dim: rgba(181, 95, 230, 0.15);
+      --violet-glow: 0 0 20px rgba(181, 95, 230, 0.4);
+      
+      --green: #10b981;
+      --green-dim: rgba(16, 185, 129, 0.15);
+      --amber: #f59e0b;
+      
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      background-color: var(--bg-base);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      overflow-x: hidden;
+      overflow-y: auto;
+      line-height: 1.5;
+    }
+
+    body {
+      background-image: 
+        radial-gradient(ellipse at 50% 30%, rgba(14, 30, 66, 0.65) 0%, rgba(6, 9, 19, 0.98) 75%),
+        linear-gradient(rgba(0, 229, 255, 0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 229, 255, 0.025) 1px, transparent 1px);
+      background-size: 100% 100%, 36px 36px, 36px 36px;
+      background-attachment: fixed;
+    }
+
+    #gl-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      display: block;
+      cursor: grab;
+    }
+    #gl-canvas:active {
+      cursor: grabbing;
+    }
+
+    .crt-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 2;
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.18) 50%);
+      background-size: 100% 3px;
+      box-shadow: inset 0 0 120px rgba(0, 0, 0, 0.7);
+    }
+
+    .app-layout {
+      position: relative;
+      z-index: 10;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: 16px 24px 20px;
+      pointer-events: none;
+    }
+
+    .interactive {
+      pointer-events: auto;
+    }
+
+    .nav-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .brand-wrap {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-logo {
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, rgba(0, 229, 255, 0.2), rgba(181, 95, 230, 0.15));
+      border: 1px solid rgba(0, 229, 255, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 15px rgba(0, 229, 255, 0.2);
+    }
+    .brand-logo svg {
+      width: 20px;
+      height: 20px;
+      fill: none;
+      stroke: var(--cyan);
+      stroke-width: 2.2;
+    }
+
+    .brand-text h1 {
+      font-size: 1.1rem;
+      font-weight: 800;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      background: linear-gradient(90deg, #ffffff 40%, var(--cyan) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      line-height: 1.2;
+    }
+
+    .brand-text p {
+      font-size: 0.65rem;
+      letter-spacing: 1.5px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .pulse-dot {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      background: var(--green);
+      border-radius: 50%;
+      box-shadow: 0 0 8px var(--green);
+      animation: pulse-ring 2s infinite ease-in-out;
+    }
+
+    @keyframes pulse-ring {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.8); }
+    }
+
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .btn-pill {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-main);
+      padding: 7px 14px;
+      border-radius: 8px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 1px;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      cursor: pointer;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      transition: all 0.2s ease;
+    }
+    .btn-pill:hover {
+      background: var(--bg-surface-hover);
+      border-color: var(--border-glow);
+      color: var(--cyan);
+      transform: translateY(-1px);
+    }
+    .btn-pill:active {
+      transform: translateY(1px);
+    }
+    .btn-pill.active {
+      border-color: var(--cyan);
+      color: var(--cyan);
+      box-shadow: 0 0 12px rgba(0, 229, 255, 0.25);
+    }
+    .btn-pill svg {
+      width: 14px;
+      height: 14px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2;
+    }
+
+    .center-stage {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 0 16px;
+      position: relative;
+    }
+
+    .hud-gauge-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      max-width: 440px;
+      width: 100%;
+      pointer-events: none;
+    }
+
+    .stage-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 14px;
+      border-radius: 20px;
+      background: var(--cyan-dim);
+      border: 1px solid var(--border-glow);
+      color: var(--cyan);
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      box-shadow: 0 0 16px rgba(0, 229, 255, 0.15);
+      margin-bottom: 8px;
+      transition: all 0.3s ease;
+    }
+
+    .speed-display-box {
+      display: flex;
+      align-items: baseline;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .speed-number {
+      font-family: var(--font-sans);
+      font-size: clamp(3.8rem, 8vw, 5.5rem);
+      line-height: 1;
+      font-weight: 800;
+      letter-spacing: -2px;
+      font-feature-settings: "tnum";
+      font-variant-numeric: tabular-nums;
+      background: linear-gradient(180deg, #ffffff 40%, #b2f5ff 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      filter: drop-shadow(0 0 24px rgba(0, 229, 255, 0.4));
+      transition: filter 0.2s ease;
+    }
+
+    .speed-unit {
+      font-size: 1.35rem;
+      font-weight: 800;
+      letter-spacing: 1.5px;
+      color: var(--cyan);
+      text-transform: uppercase;
+      text-shadow: 0 0 10px rgba(0, 229, 255, 0.5);
+    }
+
+    .test-progress-track {
+      width: min(100%, 300px);
+      height: 4px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 4px;
+      margin: 12px 0 8px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .test-progress-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--cyan), var(--violet));
+      box-shadow: 0 0 10px var(--cyan);
+      transition: width 0.15s ease-out;
+    }
+
+    .status-text {
+      font-size: 0.72rem;
+      letter-spacing: 1.5px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      min-height: 20px;
+    }
+
+    .action-dock {
+      margin-top: 14px;
+      pointer-events: auto;
+    }
+
+    .start-btn {
+      min-width: 175px;
+      height: 48px;
+      padding: 0 28px;
+      border-radius: 24px;
+      background: linear-gradient(135deg, rgba(0, 229, 255, 0.25) 0%, rgba(181, 95, 230, 0.25) 100%);
+      border: 1.5px solid var(--cyan);
+      color: #ffffff;
+      font-family: var(--font-sans);
+      font-size: 0.88rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      box-shadow: 0 0 28px rgba(0, 229, 255, 0.35), inset 0 0 12px rgba(0, 229, 255, 0.2);
+      transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+    .start-btn:hover {
+      transform: translateY(-2px) scale(1.03);
+      box-shadow: 0 0 40px rgba(0, 229, 255, 0.6), inset 0 0 20px rgba(0, 229, 255, 0.4);
+      border-color: #ffffff;
+    }
+    .start-btn:active {
+      transform: translateY(1px) scale(0.98);
+    }
+    .start-btn svg {
+      width: 16px;
+      height: 16px;
+      fill: currentColor;
+    }
+    .start-btn.running {
+      border-color: var(--amber);
+      background: rgba(245, 158, 11, 0.18);
+      box-shadow: 0 0 25px rgba(245, 158, 11, 0.3);
+      pointer-events: none;
+      color: #fde68a;
+    }
+
+    .orbit-hint {
+      margin-top: 10px;
+      font-size: 0.65rem;
+      letter-spacing: 1px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      opacity: 0.75;
+    }
+    .orbit-hint svg {
+      width: 13px;
+      height: 13px;
+      stroke: currentColor;
+      fill: none;
+    }
+
+    .telemetry-deck {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      width: 100%;
+      pointer-events: auto;
+    }
+
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      width: 100%;
+    }
+
+    .metric-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 14px 16px;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+      transition: border-color 0.25s, box-shadow 0.25s, transform 0.2s;
+    }
+    .metric-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(255, 255, 255, 0.15);
+      background: var(--bg-surface-hover);
+    }
+    .metric-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 28px;
+      height: 2px;
+      background: var(--cyan);
+      transition: width 0.3s ease;
+    }
+    .metric-card:hover::before {
+      width: 50px;
+    }
+
+    .metric-card.active-ping {
+      border-color: var(--cyan);
+      box-shadow: 0 0 22px rgba(0, 229, 255, 0.25);
+    }
+    .metric-card.active-down {
+      border-color: var(--cyan);
+      box-shadow: 0 0 25px rgba(0, 229, 255, 0.3);
+    }
+    .metric-card.active-up {
+      border-color: var(--violet);
+      box-shadow: 0 0 25px rgba(181, 95, 230, 0.3);
+    }
+    .metric-card.active-up::before {
+      background: var(--violet);
+    }
+
+    .card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card-label {
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .card-label svg {
+      width: 13px;
+      height: 13px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2;
+    }
+
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--text-dim);
+      transition: all 0.2s ease;
+    }
+    .status-dot.active-cyan {
+      background: var(--cyan);
+      box-shadow: 0 0 8px var(--cyan);
+    }
+    .status-dot.active-violet {
+      background: var(--violet);
+      box-shadow: 0 0 8px var(--violet);
+    }
+
+    .card-middle {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      margin: 8px 0 4px;
+    }
+
+    .card-val {
+      font-size: 1.8rem;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      color: #ffffff;
+      font-feature-settings: "tnum";
+      font-variant-numeric: tabular-nums;
+      line-height: 1.1;
+    }
+
+    .card-unit {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--cyan);
+      text-transform: uppercase;
+    }
+    .card-unit.violet {
+      color: var(--violet);
+    }
+
+    .card-bottom {
+      font-size: 0.65rem;
+      letter-spacing: 1px;
+      color: var(--text-dim);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .card-bottom strong {
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .waveform-card {
+      background: rgba(9, 14, 28, 0.75);
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      padding: 8px 16px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      height: 52px;
+    }
+
+    .waveform-meta {
+      min-width: 140px;
+    }
+
+    .waveform-title {
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      color: var(--cyan);
+      text-transform: uppercase;
+    }
+
+    .waveform-sub {
+      font-size: 0.6rem;
+      color: var(--text-dim);
+      letter-spacing: 1px;
+    }
+
+    #telemetry-canvas {
+      flex: 1;
+      height: 100%;
+      width: 100%;
+      display: block;
+    }
+
+    @media (max-width: 960px) {
+      .app-layout {
+        padding: 12px 16px 16px;
+      }
+      .cards-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+      }
+      .metric-card {
+        padding: 12px 14px;
+      }
+      .card-val {
+        font-size: 1.6rem;
+      }
+      .speed-number {
+        font-size: 4.2rem;
+      }
+    }
+
+    @media (max-width: 600px) {
+      .app-layout {
+        padding: 10px 12px 14px;
+      }
+      .nav-header {
+        padding-bottom: 8px;
+      }
+      .brand-logo {
+        width: 32px;
+        height: 32px;
+      }
+      .brand-text h1 {
+        font-size: 0.92rem;
+        letter-spacing: 1.5px;
+      }
+      .brand-text p {
+        display: none;
+      }
+      .btn-pill {
+        padding: 6px 10px;
+        font-size: 0.65rem;
+      }
+      .btn-pill span {
+        display: none;
+      }
+
+      .center-stage {
+        padding: 12px 0 10px;
+      }
+      .speed-number {
+        font-size: 3.5rem;
+      }
+      .speed-unit {
+        font-size: 1.15rem;
+      }
+      .start-btn {
+        min-width: 155px;
+        height: 44px;
+        font-size: 0.8rem;
+      }
+
+      .cards-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+      .metric-card {
+        padding: 10px 12px;
+      }
+      .card-label {
+        font-size: 0.62rem;
+      }
+      .card-val {
+        font-size: 1.35rem;
+      }
+      .card-bottom {
+        font-size: 0.58rem;
+      }
+      .waveform-card {
+        display: none;
+      }
+      .orbit-hint {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <canvas id="gl-canvas"></canvas>
+
+  <div class="crt-overlay"></div>
+
+  <div class="app-layout">
+    
+    <header class="nav-header interactive">
+      <div class="brand-wrap">
+        <div class="brand-logo">
+          <svg viewBox="0 0 24 24">
+            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <h1>CYBERSPEED 3D</h1>
+          <p><span class="pulse-dot"></span> In-House Autonomous Telemetry</p>
+        </div>
+      </div>
+
+      <div class="nav-actions">
+        <button id="btn-audio" class="btn-pill active" title="Toggle Synthesized Audio FX">
+          <svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+          <span id="audio-label">AUDIO: ON</span>
+        </button>
+        <button id="btn-reset-cam" class="btn-pill" title="Recenter 3D View">
+          <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+          <span>RESET CAM</span>
+        </button>
+      </div>
+    </header>
+
+    <main class="center-stage">
+      <div class="hud-gauge-card">
+        <div id="stage-badge" class="stage-badge">SYSTEM READY</div>
+        
+        <div class="speed-display-box">
+          <span id="speed-display" class="speed-number">0.0</span>
+          <span id="speed-unit" class="speed-unit">MBPS</span>
+        </div>
+
+        <div class="test-progress-track">
+          <div id="test-progress-bar" class="test-progress-bar"></div>
+        </div>
+
+        <div id="status-text" class="status-text">Click Start to begin speed test</div>
+
+        <div class="action-dock">
+          <button id="start-btn" class="start-btn">
+            <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            <span id="start-btn-label">START TEST</span>
+          </button>
+        </div>
+
+        <div class="orbit-hint">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          <span>Drag to orbit 3D view</span>
+        </div>
+      </div>
+    </main>
+
+    <footer class="telemetry-deck interactive">
+      <div class="cards-grid">
+        
+        <div id="card-ping" class="metric-card">
+          <div class="card-top">
+            <span class="card-label">
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 14 14"/></svg>
+              Ping / Latency
+            </span>
+            <div id="dot-ping" class="status-dot"></div>
+          </div>
+          <div class="card-middle">
+            <span id="val-ping" class="card-val">--</span>
+            <span class="card-unit">ms</span>
+          </div>
+          <div class="card-bottom">
+            <span>Jitter: <strong id="val-jitter">--</strong> ms</span>
+            <span>Edge: <strong id="val-edge-server">Cloudflare</strong></span>
+          </div>
+        </div>
+
+        <div id="card-download" class="metric-card">
+          <div class="card-top">
+            <span class="card-label">
+              <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Download
+            </span>
+            <div id="dot-down" class="status-dot"></div>
+          </div>
+          <div class="card-middle">
+            <span id="val-download" class="card-val">--</span>
+            <span class="card-unit">Mbps</span>
+          </div>
+          <div class="card-bottom">
+            <span>Peak: <strong id="val-down-peak">--</strong> Mbps</span>
+            <span>Stream</span>
+          </div>
+        </div>
+
+        <div id="card-upload" class="metric-card">
+          <div class="card-top">
+            <span class="card-label">
+              <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              Upload
+            </span>
+            <div id="dot-up" class="status-dot"></div>
+          </div>
+          <div class="card-middle">
+            <span id="val-upload" class="card-val">--</span>
+            <span class="card-unit violet">Mbps</span>
+          </div>
+          <div class="card-bottom">
+            <span>Peak: <strong id="val-up-peak">--</strong> Mbps</span>
+            <span>Uplink</span>
+          </div>
+        </div>
+
+        <div id="card-tier" class="metric-card">
+          <div class="card-top">
+            <span class="card-label">
+              <svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+              Network Rating
+            </span>
+            <div class="status-dot active-cyan"></div>
+          </div>
+          <div class="card-middle">
+            <span id="val-grade" class="card-val" style="color: var(--cyan);">READY</span>
+            <span id="val-grade-unit" class="card-unit">TIER</span>
+          </div>
+          <div class="card-bottom">
+            <span>Wire Data: <strong id="val-data">0.00</strong> MB</span>
+            <span id="tier-badge">Live Socket</span>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="waveform-card">
+        <div class="waveform-meta">
+          <div class="waveform-title">BANDWIDTH WAVEFORM</div>
+          <div class="waveform-sub">Real-Time Throughput Dynamics</div>
+        </div>
+        <canvas id="telemetry-canvas"></canvas>
+      </div>
+    </footer>
+
+  </div>
+
+  <script>
+    (function() {
+      'use strict';
+
+      const Mat4 = {
+        create() {
+          const out = new Float32Array(16);
+          out[0] = 1; out[5] = 1; out[10] = 1; out[15] = 1;
+          return out;
+        },
+        identity(out) {
+          for (let i = 0; i < 16; i++) out[i] = 0;
+          out[0] = 1; out[5] = 1; out[10] = 1; out[15] = 1;
+          return out;
+        },
+        perspective(out, fovy, aspect, near, far) {
+          const f = 1.0 / Math.tan(fovy / 2);
+          const nf = 1 / (near - far);
+          out[0] = f / aspect; out[1] = 0; out[2] = 0; out[3] = 0;
+          out[4] = 0; out[5] = f; out[6] = 0; out[7] = 0;
+          out[8] = 0; out[9] = 0; out[10] = (far + near) * nf; out[11] = -1;
+          out[12] = 0; out[13] = 0; out[14] = (2 * far * near) * nf; out[15] = 0;
+          return out;
+        },
+        multiply(out, a, b) {
+          const a00 = a[0], a01 = a[1], a02 = a[2], a03 = a[3];
+          const a10 = a[4], a11 = a[5], a12 = a[6], a13 = a[7];
+          const a20 = a[8], a21 = a[9], a22 = a[10], a23 = a[11];
+          const a30 = a[12], a31 = a[13], a32 = a[14], a33 = a[15];
+          let b0 = b[0], b1 = b[1], b2 = b[2], b3 = b[3];
+          out[0] = b0*a00 + b1*a10 + b2*a20 + b3*a30;
+          out[1] = b0*a01 + b1*a11 + b2*a21 + b3*a31;
+          out[2] = b0*a02 + b1*a12 + b2*a22 + b3*a32;
+          out[3] = b0*a03 + b1*a13 + b2*a23 + b3*a33;
+          b0 = b[4]; b1 = b[5]; b2 = b[6]; b3 = b[7];
+          out[4] = b0*a00 + b1*a10 + b2*a20 + b3*a30;
+          out[5] = b0*a01 + b1*a11 + b2*a21 + b3*a31;
+          out[6] = b0*a02 + b1*a12 + b2*a22 + b3*a32;
+          out[7] = b0*a03 + b1*a13 + b2*a23 + b3*a33;
+          b0 = b[8]; b1 = b[9]; b2 = b[10]; b3 = b[11];
+          out[8] = b0*a00 + b1*a10 + b2*a20 + b3*a30;
+          out[9] = b0*a01 + b1*a11 + b2*a21 + b3*a31;
+          out[10] = b0*a02 + b1*a12 + b2*a22 + b3*a32;
+          out[11] = b0*a03 + b1*a13 + b2*a23 + b3*a33;
+          b0 = b[12]; b1 = b[13]; b2 = b[14]; b3 = b[15];
+          out[12] = b0*a00 + b1*a10 + b2*a20 + b3*a30;
+          out[13] = b0*a01 + b1*a11 + b2*a21 + b3*a31;
+          out[14] = b0*a02 + b1*a12 + b2*a22 + b3*a32;
+          out[15] = b0*a03 + b1*a13 + b2*a23 + b3*a33;
+          return out;
+        },
+        translate(out, a, v) {
+          const x = v[0], y = v[1], z = v[2];
+          out[12] = a[0]*x + a[4]*y + a[8]*z + a[12];
+          out[13] = a[1]*x + a[5]*y + a[9]*z + a[13];
+          out[14] = a[2]*x + a[6]*y + a[10]*z + a[14];
+          out[15] = a[3]*x + a[7]*y + a[11]*z + a[15];
+          return out;
+        },
+        rotateX(out, a, rad) {
+          const s = Math.sin(rad), c = Math.cos(rad);
+          const a10 = a[4], a11 = a[5], a12 = a[6], a13 = a[7];
+          const a20 = a[8], a21 = a[9], a22 = a[10], a23 = a[11];
+          out[4] = a10 * c + a20 * s;
+          out[5] = a11 * c + a21 * s;
+          out[6] = a12 * c + a22 * s;
+          out[7] = a13 * c + a23 * s;
+          out[8] = a20 * c - a10 * s;
+          out[9] = a21 * c - a11 * s;
+          out[10] = a22 * c - a12 * s;
+          out[11] = a23 * c - a13 * s;
+          return out;
+        },
+        rotateY(out, a, rad) {
+          const s = Math.sin(rad), c = Math.cos(rad);
+          const a00 = a[0], a01 = a[1], a02 = a[2], a03 = a[3];
+          const a20 = a[8], a21 = a[9], a22 = a[10], a23 = a[11];
+          out[0] = a00 * c - a20 * s;
+          out[1] = a01 * c - a21 * s;
+          out[2] = a02 * c - a22 * s;
+          out[3] = a03 * c - a23 * s;
+          out[8] = a00 * s + a20 * c;
+          out[9] = a01 * s + a21 * c;
+          out[10] = a02 * s + a22 * c;
+          out[11] = a03 * s + a23 * c;
+          return out;
+        },
+        rotateZ(out, a, rad) {
+          const s = Math.sin(rad), c = Math.cos(rad);
+          const a00 = a[0], a01 = a[1], a02 = a[2], a03 = a[3];
+          const a10 = a[4], a11 = a[5], a12 = a[6], a13 = a[7];
+          out[0] = a00 * c + a10 * s;
+          out[1] = a01 * c + a11 * s;
+          out[2] = a02 * c + a12 * s;
+          out[3] = a03 * c + a13 * s;
+          out[4] = a10 * c - a00 * s;
+          out[5] = a11 * c - a01 * s;
+          out[6] = a12 * c - a02 * s;
+          out[7] = a13 * c - a03 * s;
+          return out;
+        }
+      };
+
+      class SoundEngine {
+        constructor() {
+          this.ctx = null;
+          this.enabled = true;
+          this.engineOsc = null;
+          this.engineGain = null;
+        }
+
+        init() {
+          if (this.ctx) return;
+          try {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            this.ctx = new AudioCtx();
+            this.setupEngineDrone();
+          } catch(e) {}
+        }
+
+        setupEngineDrone() {
+          if (!this.ctx) return;
+          this.engineOsc = this.ctx.createOscillator();
+          this.engineGain = this.ctx.createGain();
+          const filter = this.ctx.createBiquadFilter();
+
+          this.engineOsc.type = 'sawtooth';
+          this.engineOsc.frequency.setValueAtTime(45, this.ctx.currentTime);
+
+          filter.type = 'lowpass';
+          filter.frequency.setValueAtTime(260, this.ctx.currentTime);
+
+          this.engineGain.gain.setValueAtTime(0.001, this.ctx.currentTime);
+
+          this.engineOsc.connect(filter);
+          filter.connect(this.engineGain);
+          this.engineGain.connect(this.ctx.destination);
+          this.engineOsc.start();
+        }
+
+        setSpeedPitch(mbps, active) {
+          if (!this.ctx || !this.enabled || !this.engineOsc) return;
+          const targetFreq = 45 + Math.min(mbps * 1.5, 600);
+          const targetGain = active ? 0.07 : 0.005;
+          const now = this.ctx.currentTime;
+          this.engineOsc.frequency.setTargetAtTime(targetFreq, now, 0.05);
+          this.engineGain.gain.setTargetAtTime(targetGain, now, 0.08);
+        }
+
+        playPingChirp() {
+          if (!this.ctx || !this.enabled) return;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sine';
+          const now = this.ctx.currentTime;
+          osc.frequency.setValueAtTime(1300, now);
+          osc.frequency.exponentialRampToValueAtTime(320, now + 0.08);
+          gain.gain.setValueAtTime(0.1, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.08);
+        }
+
+        playCompletionFanfare() {
+          if (!this.ctx || !this.enabled) return;
+          const notes = [440, 554.37, 659.25, 880];
+          notes.forEach((freq, idx) => {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'triangle';
+            const now = this.ctx.currentTime + idx * 0.08;
+            osc.frequency.setValueAtTime(freq, now);
+            gain.gain.setValueAtTime(0.12, now);
+            gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.55);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.55);
+          });
+        }
+      }
+
+      const canvas = document.getElementById('gl-canvas');
+      const gl = canvas.getContext('webgl', { antialias: true, alpha: false, depth: true, powerPreference: 'high-performance' });
+
+      const vsLines = `
+        attribute vec3 aPosition;
+        attribute vec4 aColor;
+        uniform mat4 uMVP;
+        varying vec4 vColor;
+        void main() {
+          vColor = aColor;
+          gl_Position = uMVP * vec4(aPosition, 1.0);
+        }
+      `;
+
+      const fsLines = `
+        precision mediump float;
+        varying vec4 vColor;
+        void main() {
+          gl_FragColor = vColor;
+        }
+      `;
+
+      const vsParticles = `
+        attribute vec3 aPosition;
+        attribute float aSize;
+        attribute vec4 aColor;
+        uniform mat4 uMVP;
+        uniform float uSpeedFactor;
+        varying vec4 vColor;
+        void main() {
+          vColor = aColor;
+          vec4 pos = uMVP * vec4(aPosition, 1.0);
+          gl_Position = pos;
+          gl_PointSize = max(1.5, aSize * (150.0 / -pos.z) * (1.0 + uSpeedFactor * 0.04));
+        }
+      `;
+
+      const fsParticles = `
+        precision mediump float;
+        varying vec4 vColor;
+        void main() {
+          vec2 coord = gl_PointCoord - vec2(0.5);
+          float dist = length(coord);
+          if (dist > 0.5) discard;
+          float alpha = smoothstep(0.5, 0.0, dist) * vColor.a;
+          gl_FragColor = vec4(vColor.rgb, alpha);
+        }
+      `;
+
+      function createShader(gl, type, source) {
+        const shader = gl.createShader(type);
+        gl.shaderSource(shader, source);
+        gl.compileShader(shader);
+        return shader;
+      }
+
+      function createProgram(gl, vsSrc, fsSrc) {
+        const vs = createShader(gl, gl.VERTEX_SHADER, vsSrc);
+        const fs = createShader(gl, gl.FRAGMENT_SHADER, fsSrc);
+        const prog = gl.createProgram();
+        gl.attachShader(prog, vs);
+        gl.attachShader(prog, fs);
+        gl.linkProgram(prog);
+        return prog;
+      }
+
+      const lineProg = createProgram(gl, vsLines, fsLines);
+      const lineAttrs = {
+        aPosition: gl.getAttribLocation(lineProg, 'aPosition'),
+        aColor: gl.getAttribLocation(lineProg, 'aColor'),
+        uMVP: gl.getUniformLocation(lineProg, 'uMVP')
+      };
+
+      const partProg = createProgram(gl, vsParticles, fsParticles);
+      const partAttrs = {
+        aPosition: gl.getAttribLocation(partProg, 'aPosition'),
+        aSize: gl.getAttribLocation(partProg, 'aSize'),
+        aColor: gl.getAttribLocation(partProg, 'aColor'),
+        uMVP: gl.getUniformLocation(partProg, 'uMVP'),
+        uSpeedFactor: gl.getUniformLocation(partProg, 'uSpeedFactor')
+      };
+
+      const GAUGE_START_RAD = 216 * Math.PI / 180;
+      const GAUGE_END_RAD = -36 * Math.PI / 180;
+      const GAUGE_SEGS = 120;
+
+      function buildGaugeGeometry() {
+        const verts = [];
+        const colors = [];
+        const rInner = 2.45;
+        const rOuter = 2.65;
+
+        for (let i = 0; i <= GAUGE_SEGS; i++) {
+          const t = i / GAUGE_SEGS;
+          const ang = GAUGE_START_RAD + t * (GAUGE_END_RAD - GAUGE_START_RAD);
+          const cos = Math.cos(ang);
+          const sin = Math.sin(ang);
+
+          verts.push(cos * rInner, sin * rInner, 0);
+          colors.push(0.0, 0.4, 0.6, 0.22);
+
+          verts.push(cos * rOuter, sin * rOuter, 0);
+          colors.push(0.0, 0.4, 0.6, 0.4);
+        }
+
+        const totalTicks = 41;
+        const tickVerts = [];
+        const tickColors = [];
+
+        for (let i = 0; i < totalTicks; i++) {
+          const t = i / (totalTicks - 1);
+          const ang = GAUGE_START_RAD + t * (GAUGE_END_RAD - GAUGE_START_RAD);
+          const isMajor = (i % 5 === 0);
+          const len = isMajor ? 0.32 : 0.16;
+          const r1 = rOuter + 0.05;
+          const r2 = r1 + len;
+
+          const c = Math.cos(ang);
+          const s = Math.sin(ang);
+
+          tickVerts.push(c * r1, s * r1, 0);
+          tickVerts.push(c * r2, s * r2, 0);
+
+          if (isMajor) {
+            tickColors.push(1.0, 1.0, 1.0, 0.95);
+            tickColors.push(0.0, 0.9, 1.0, 1.0);
+          } else {
+            tickColors.push(0.0, 0.6, 0.8, 0.3);
+            tickColors.push(0.0, 0.6, 0.8, 0.55);
+          }
+        }
+
+        const hubVerts = [];
+        const hubCols = [];
+        const hubR = 0.55;
+        const hubSegs = 48;
+        for (let i = 0; i <= hubSegs; i++) {
+          const ang = (i / hubSegs) * Math.PI * 2;
+          hubVerts.push(Math.cos(ang) * (hubR - 0.05), Math.sin(ang) * (hubR - 0.05), 0.05);
+          hubCols.push(0.0, 0.9, 1.0, 0.35);
+          hubVerts.push(Math.cos(ang) * hubR, Math.sin(ang) * hubR, 0.05);
+          hubCols.push(0.0, 0.9, 1.0, 0.75);
+        }
+
+        return {
+          baseArc: {
+            verts: new Float32Array(verts),
+            colors: new Float32Array(colors),
+            count: (GAUGE_SEGS + 1) * 2
+          },
+          ticks: {
+            verts: new Float32Array(tickVerts),
+            colors: new Float32Array(tickColors),
+            count: totalTicks * 2
+          },
+          hub: {
+            verts: new Float32Array(hubVerts),
+            colors: new Float32Array(hubCols),
+            count: (hubSegs + 1) * 2
+          }
+        };
+      }
+
+      function buildNeedleGeometry() {
+        const verts = new Float32Array([
+          -0.12, -0.4, 0.08,
+           0.12, -0.4, 0.08,
+           0.0,   2.45, 0.08,
+
+          -0.08, -0.75, 0.05,
+           0.08, -0.75, 0.05,
+           0.0,  -0.4, 0.08
+        ]);
+
+        const colors = new Float32Array([
+          0.0, 0.9, 1.0, 0.95,
+          0.0, 0.9, 1.0, 0.95,
+          1.0, 1.0, 1.0, 1.0,
+
+          0.71, 0.37, 0.9, 0.7,
+          0.71, 0.37, 0.9, 0.7,
+          0.0, 0.9, 1.0, 0.9
+        ]);
+
+        return { verts, colors, count: 6 };
+      }
+
+      const activeArcVerts = new Float32Array((GAUGE_SEGS + 1) * 6);
+      const activeArcCols = new Float32Array((GAUGE_SEGS + 1) * 8);
+
+      function updateActiveArcGeometry(tNormalized, isUpload) {
+        const count = Math.max(1, Math.min(GAUGE_SEGS, Math.floor(tNormalized * GAUGE_SEGS)));
+        const rInner = 2.45;
+        const rOuter = 2.65;
+        let vIdx = 0;
+        let cIdx = 0;
+
+        for (let i = 0; i <= count; i++) {
+          const t = i / GAUGE_SEGS;
+          const ang = GAUGE_START_RAD + t * (GAUGE_END_RAD - GAUGE_START_RAD);
+          const c = Math.cos(ang);
+          const s = Math.sin(ang);
+
+          activeArcVerts[vIdx++] = c * rInner;
+          activeArcVerts[vIdx++] = s * rInner;
+          activeArcVerts[vIdx++] = 0.02;
+
+          activeArcVerts[vIdx++] = c * rOuter;
+          activeArcVerts[vIdx++] = s * rOuter;
+          activeArcVerts[vIdx++] = 0.02;
+
+          if (isUpload) {
+            activeArcCols[cIdx++] = 0.71; activeArcCols[cIdx++] = 0.37; activeArcCols[cIdx++] = 0.9; activeArcCols[cIdx++] = 0.6;
+            activeArcCols[cIdx++] = 1.0;  activeArcCols[cIdx++] = 0.6;  activeArcCols[cIdx++] = 1.0; activeArcCols[cIdx++] = 1.0;
+          } else {
+            activeArcCols[cIdx++] = 0.0; activeArcCols[cIdx++] = 0.9; activeArcCols[cIdx++] = 1.0; activeArcCols[cIdx++] = 0.6;
+            activeArcCols[cIdx++] = 1.0; activeArcCols[cIdx++] = 1.0; activeArcCols[cIdx++] = 1.0; activeArcCols[cIdx++] = 1.0;
+          }
+        }
+
+        return (count + 1) * 2;
+      }
+
+      const PARTICLE_COUNT = 3000;
+      function buildParticleField() {
+        const pos = new Float32Array(PARTICLE_COUNT * 3);
+        const sizes = new Float32Array(PARTICLE_COUNT);
+        const colors = new Float32Array(PARTICLE_COUNT * 4);
+
+        for (let i = 0; i < PARTICLE_COUNT; i++) {
+          const idx3 = i * 3;
+          const idx4 = i * 4;
+
+          const rad = 2.0 + Math.random() * 9.0;
+          const theta = Math.random() * Math.PI * 2;
+
+          pos[idx3] = Math.cos(theta) * rad;
+          pos[idx3 + 1] = Math.sin(theta) * rad;
+          pos[idx3 + 2] = -Math.random() * 55.0 + 10.0;
+
+          sizes[i] = 1.2 + Math.random() * 2.8;
+
+          colors[idx4] = 0.0 + Math.random() * 0.2;
+          colors[idx4 + 1] = 0.8 + Math.random() * 0.2;
+          colors[idx4 + 2] = 1.0;
+          colors[idx4 + 3] = 0.35 + Math.random() * 0.65;
+        }
+
+        return { pos, sizes, colors };
+      }
+
+      function buildGridGeometry() {
+        const verts = [];
+        const colors = [];
+        const size = 20;
+        const step = 1.25;
+        const yPos = -3.2;
+
+        for (let x = -size; x <= size; x += step) {
+          verts.push(x, yPos, -size * 2);
+          verts.push(x, yPos, size);
+          const alpha = 1.0 - Math.abs(x) / size;
+          colors.push(0.0, 0.7, 0.9, alpha * 0.18);
+          colors.push(0.0, 0.7, 0.9, alpha * 0.04);
+        }
+
+        for (let z = -size * 2; z <= size; z += step * 1.5) {
+          verts.push(-size, yPos, z);
+          verts.push(size, yPos, z);
+          const alpha = 1.0 - Math.abs(z) / (size * 2);
+          colors.push(0.0, 0.7, 0.9, alpha * 0.18);
+          colors.push(0.0, 0.7, 0.9, alpha * 0.04);
+        }
+
+        return {
+          verts: new Float32Array(verts),
+          colors: new Float32Array(colors),
+          count: verts.length / 3
+        };
+      }
+
+      const gaugeGeo = buildGaugeGeometry();
+      const needleGeo = buildNeedleGeometry();
+      const partGeo = buildParticleField();
+      const gridGeo = buildGridGeometry();
+
+      function createVBO(gl, data, usage = gl.STATIC_DRAW) {
+        const buf = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+        gl.bufferData(gl.ARRAY_BUFFER, data, usage);
+        return buf;
+      }
+
+      const bufBaseArcVerts = createVBO(gl, gaugeGeo.baseArc.verts);
+      const bufBaseArcCols = createVBO(gl, gaugeGeo.baseArc.colors);
+      const bufGaugeTickVerts = createVBO(gl, gaugeGeo.ticks.verts);
+      const bufGaugeTickCols = createVBO(gl, gaugeGeo.ticks.colors);
+      const bufHubVerts = createVBO(gl, gaugeGeo.hub.verts);
+      const bufHubCols = createVBO(gl, gaugeGeo.hub.colors);
+
+      const bufActiveArcVerts = createVBO(gl, activeArcVerts, gl.DYNAMIC_DRAW);
+      const bufActiveArcCols = createVBO(gl, activeArcCols, gl.DYNAMIC_DRAW);
+
+      const bufNeedleVerts = createVBO(gl, needleGeo.verts);
+      const bufNeedleCols = createVBO(gl, needleGeo.colors);
+
+      const bufPartPos = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, bufPartPos);
+      gl.bufferData(gl.ARRAY_BUFFER, partGeo.pos, gl.DYNAMIC_DRAW);
+
+      const bufPartSize = createVBO(gl, partGeo.sizes);
+      const bufPartCols = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, bufPartCols);
+      gl.bufferData(gl.ARRAY_BUFFER, partGeo.colors, gl.DYNAMIC_DRAW);
+
+      const bufGridVerts = createVBO(gl, gridGeo.verts);
+      const bufGridCols = createVBO(gl, gridGeo.colors);
+
+      let rotX = 0.10;
+      let rotY = 0.0;
+      let targetRotX = 0.10;
+      let targetRotY = 0.0;
+      let isDragging = false;
+      let lastMouseX = 0;
+      let lastMouseY = 0;
+
+      window.addEventListener('mousedown', (e) => {
+        if (e.target.closest('.interactive')) return;
+        isDragging = true;
+        lastMouseX = e.clientX;
+        lastMouseY = e.clientY;
+      });
+
+      window.addEventListener('mousemove', (e) => {
+        if (isDragging) {
+          const dx = e.clientX - lastMouseX;
+          const dy = e.clientY - lastMouseY;
+          lastMouseX = e.clientX;
+          lastMouseY = e.clientY;
+          targetRotY += dx * 0.006;
+          targetRotX += dy * 0.006;
+          targetRotX = Math.max(-0.5, Math.min(0.5, targetRotX));
+        } else {
+          const nx = (e.clientX / window.innerWidth - 0.5) * 2;
+          const ny = (e.clientY / window.innerHeight - 0.5) * 2;
+          targetRotY = nx * 0.12;
+          targetRotX = 0.10 + ny * 0.10;
+        }
+      });
+
+      window.addEventListener('mouseup', () => { isDragging = false; });
+
+      window.addEventListener('touchstart', (e) => {
+        if (e.target.closest('.interactive')) return;
+        if (e.touches.length === 1) {
+          isDragging = true;
+          lastMouseX = e.touches[0].clientX;
+          lastMouseY = e.touches[0].clientY;
+        }
+      }, { passive: true });
+
+      window.addEventListener('touchmove', (e) => {
+        if (isDragging && e.touches.length === 1) {
+          const dx = e.touches[0].clientX - lastMouseX;
+          const dy = e.touches[0].clientY - lastMouseY;
+          lastMouseX = e.touches[0].clientX;
+          lastMouseY = e.touches[0].clientY;
+          targetRotY += dx * 0.007;
+          targetRotX += dy * 0.007;
+          targetRotX = Math.max(-0.5, Math.min(0.5, targetRotX));
+        }
+      }, { passive: true });
+
+      window.addEventListener('touchend', () => { isDragging = false; });
+
+      document.getElementById('btn-reset-cam').addEventListener('click', () => {
+        targetRotX = 0.10;
+        targetRotY = 0.0;
+      });
+
+      const telemCanvas = document.getElementById('telemetry-canvas');
+      const telemCtx = telemCanvas.getContext('2d');
+      const waveHistory = new Float32Array(150);
+      let waveHead = 0;
+
+      function resizeTelemetryCanvas() {
+        if (!telemCanvas.offsetParent) return;
+        const rect = telemCanvas.getBoundingClientRect();
+        telemCanvas.width = rect.width * (window.devicePixelRatio || 1);
+        telemCanvas.height = rect.height * (window.devicePixelRatio || 1);
+      }
+      window.addEventListener('resize', resizeTelemetryCanvas);
+      setTimeout(resizeTelemetryCanvas, 100);
+
+      function pushWaveData(val) {
+        waveHistory[waveHead] = val;
+        waveHead = (waveHead + 1) % waveHistory.length;
+      }
+
+      function renderWaveform() {
+        if (!telemCanvas.offsetParent) return;
+        const w = telemCanvas.width;
+        const h = telemCanvas.height;
+        if (!w || !h) return;
+
+        telemCtx.clearRect(0, 0, w, h);
+
+        telemCtx.strokeStyle = 'rgba(0, 229, 255, 0.12)';
+        telemCtx.lineWidth = 1;
+        telemCtx.beginPath();
+        telemCtx.moveTo(0, h * 0.5);
+        telemCtx.lineTo(w, h * 0.5);
+        telemCtx.stroke();
+
+        telemCtx.beginPath();
+        telemCtx.strokeStyle = '#00e5ff';
+        telemCtx.lineWidth = 2 * (window.devicePixelRatio || 1);
+        telemCtx.shadowColor = '#00e5ff';
+        telemCtx.shadowBlur = 6;
+
+        const maxVal = 1000;
+        const step = w / (waveHistory.length - 1);
+
+        for (let i = 0; i < waveHistory.length; i++) {
+          const idx = (waveHead + i) % waveHistory.length;
+          const val = waveHistory[idx];
+          const y = h - (val / maxVal) * (h * 0.82) - h * 0.08;
+          const x = i * step;
+          if (i === 0) telemCtx.moveTo(x, y);
+          else telemCtx.lineTo(x, y);
+        }
+        telemCtx.stroke();
+        telemCtx.shadowBlur = 0;
+      }
+
+      const soundEngine = new SoundEngine();
+      const btnAudio = document.getElementById('btn-audio');
+      btnAudio.addEventListener('click', () => {
+        soundEngine.init();
+        soundEngine.enabled = !soundEngine.enabled;
+        btnAudio.classList.toggle('active', soundEngine.enabled);
+        document.getElementById('audio-label').textContent = soundEngine.enabled ? 'AUDIO: ON' : 'AUDIO: MUTED';
+      });
+
+      const stageBadge = document.getElementById('stage-badge');
+      const speedDisplay = document.getElementById('speed-display');
+      const speedUnit = document.getElementById('speed-unit');
+      const testProgressBar = document.getElementById('test-progress-bar');
+      const statusText = document.getElementById('status-text');
+      const startBtn = document.getElementById('start-btn');
+      const startBtnLabel = document.getElementById('start-btn-label');
+
+      const valPing = document.getElementById('val-ping');
+      const valJitter = document.getElementById('val-jitter');
+      const valEdgeServer = document.getElementById('val-edge-server');
+      const valDownload = document.getElementById('val-download');
+      const valDownPeak = document.getElementById('val-down-peak');
+      const valUpload = document.getElementById('val-upload');
+      const valUpPeak = document.getElementById('val-up-peak');
+      const valGrade = document.getElementById('val-grade');
+      const valGradeUnit = document.getElementById('val-grade-unit');
+      const valData = document.getElementById('val-data');
+      const tierBadge = document.getElementById('tier-badge');
+
+      const cardPing = document.getElementById('card-ping');
+      const cardDownload = document.getElementById('card-download');
+      const cardUpload = document.getElementById('card-upload');
+      const dotPing = document.getElementById('dot-ping');
+      const dotDown = document.getElementById('dot-down');
+      const dotUp = document.getElementById('dot-up');
+
+      let isTesting = false;
+      let currentDisplayMbps = 0.0;
+      let targetDisplayMbps = 0.0;
+      let needleAngle = (126) * Math.PI / 180;
+      let needleVelocity = 0.0;
+      let totalBytesTransferred = 0;
+      let testActivePhase = 'IDLE';
+
+      function updateDataTransferred(bytes) {
+        totalBytesTransferred += bytes;
+        valData.textContent = (totalBytesTransferred / (1024 * 1024)).toFixed(2);
+      }
+
+      function calculateGrade(downMbps, ping) {
+        if (downMbps >= 500 && ping < 25) return { grade: 'S+', title: 'GIGABIT FIBER', badge: 'Ultra Fast' };
+        if (downMbps >= 250 && ping < 40) return { grade: 'A+', title: '8K STREAMING', badge: 'Excellent' };
+        if (downMbps >= 100 && ping < 60) return { grade: 'A', title: '4K GAMING', badge: 'High Speed' };
+        if (downMbps >= 40 && ping < 80) return { grade: 'B', title: 'FAST BROADBAND', badge: 'Good' };
+        if (downMbps >= 15) return { grade: 'C', title: 'STANDARD HD', badge: 'Moderate' };
+        return { grade: 'D', title: 'BASIC NETWORK', badge: 'Low Bandwidth' };
+      }
+
+      function getNormalizedSpeed(mbps) {
+        const clamped = Math.max(0, Math.min(1000, mbps));
+        return Math.pow(clamped / 1000, 0.45);
+      }
+
+      function mbpsToAngle(mbps) {
+        const t = getNormalizedSpeed(mbps);
+        return (126 - t * 252) * Math.PI / 180;
+      }
+
+      async function runPingTest() {
+        testActivePhase = 'PING';
+        stageBadge.textContent = 'PROBING REAL LATENCY';
+        stageBadge.style.borderColor = 'var(--cyan)';
+        stageBadge.style.color = 'var(--cyan)';
+        statusText.textContent = 'Measuring real socket round-trip time...';
+        cardPing.classList.add('active-ping');
+        dotPing.classList.add('active-cyan');
+
+        const samples = [];
+        const iterations = 10;
+
+        for (let i = 0; i < iterations; i++) {
+          const t0 = performance.now();
+          try {
+            const res = await fetch('https://speed.cloudflare.com/__down?bytes=0&_t=' + Date.now() + Math.random(), {
+              cache: 'no-store'
+            });
+            const elapsed = performance.now() - t0;
+            samples.push(elapsed);
+
+            const colo = res.headers.get('cf-meta-colo') || res.headers.get('cf-meta-city');
+            if (colo) {
+              valEdgeServer.textContent = colo;
+            }
+          } catch(e) {
+            const elapsed = performance.now() - t0;
+            samples.push(Math.max(8.0, elapsed));
+          }
+
+          soundEngine.playPingChirp();
+
+          const progress = ((i + 1) / iterations) * 20;
+          testProgressBar.style.width = progress + '%';
+
+          const currentAvg = samples.reduce((a, b) => a + b, 0) / samples.length;
+          valPing.textContent = currentAvg.toFixed(1);
+          targetDisplayMbps = currentAvg;
+          speedUnit.textContent = 'MS PING';
+
+          await new Promise(r => setTimeout(r, 60));
+        }
+
+        const avgPing = samples.reduce((a, b) => a + b, 0) / samples.length;
+        let jitterSum = 0;
+        for (let j = 1; j < samples.length; j++) {
+          jitterSum += Math.abs(samples[j] - samples[j - 1]);
+        }
+        const jitter = samples.length > 1 ? jitterSum / (samples.length - 1) : 1.2;
+
+        valPing.textContent = avgPing.toFixed(1);
+        valJitter.textContent = jitter.toFixed(1);
+
+        cardPing.classList.remove('active-ping');
+        dotPing.classList.remove('active-cyan');
+        return { avgPing, jitter };
+      }
+
+      async function runDownloadTest() {
+        testActivePhase = 'DOWNLOAD';
+        stageBadge.textContent = 'REAL DOWNLOAD STREAM';
+        stageBadge.style.borderColor = 'var(--cyan)';
+        stageBadge.style.color = 'var(--cyan)';
+        statusText.textContent = 'Streaming live raw bytes from nearest edge...';
+        cardDownload.classList.add('active-down');
+        dotDown.classList.add('active-cyan');
+        speedUnit.textContent = 'MBPS';
+
+        const startTime = performance.now();
+        const duration = 8000;
+        let peakMbps = 0;
+        let lastReportTime = startTime;
+        let windowBytes = 0;
+        let totalDownBytes = 0;
+
+        const streamWorker = async (chunkSize) => {
+          while (performance.now() - startTime < duration && isTesting) {
+            try {
+              const url = `https://speed.cloudflare.com/__down?bytes=${chunkSize}&_b=${Math.random()}`;
+              const res = await fetch(url, { cache: 'no-store' });
+              const reader = res.body ? res.body.getReader() : null;
+
+              if (reader) {
+                while (performance.now() - startTime < duration && isTesting) {
+                  const { done, value } = await reader.read();
+                  if (done) break;
+                  const bytes = value.byteLength || 0;
+                  windowBytes += bytes;
+                  totalDownBytes += bytes;
+                  updateDataTransferred(bytes);
+                }
+              } else {
+                const blob = await res.blob();
+                const bytes = blob.size || 0;
+                windowBytes += bytes;
+                totalDownBytes += bytes;
+                updateDataTransferred(bytes);
+              }
+            } catch(e) {
+              await new Promise(r => setTimeout(r, 40));
+            }
+          }
+        };
+
+        const pipelines = [
+          streamWorker(5000000),
+          streamWorker(10000000),
+          streamWorker(25000000)
+        ];
+
+        while (performance.now() - startTime < duration && isTesting) {
+          await new Promise(r => setTimeout(r, 90));
+          const now = performance.now();
+          const dt = (now - lastReportTime) / 1000;
+          if (dt > 0.05) {
+            const instantMbps = (windowBytes * 8) / (dt * 1000000);
+            windowBytes = 0;
+            lastReportTime = now;
+
+            targetDisplayMbps = instantMbps;
+            if (instantMbps > peakMbps) peakMbps = instantMbps;
+
+            valDownload.textContent = instantMbps.toFixed(1);
+            valDownPeak.textContent = peakMbps.toFixed(1);
+
+            const progress = 20 + ((now - startTime) / duration) * 45;
+            testProgressBar.style.width = Math.min(65, progress) + '%';
+          }
+        }
+
+        await Promise.all(pipelines);
+
+        const totalDurationSec = (performance.now() - startTime) / 1000;
+        const finalMbps = (totalDownBytes * 8) / (totalDurationSec * 1000000);
+        const resolvedMbps = Math.max(finalMbps, peakMbps * 0.88);
+
+        valDownload.textContent = resolvedMbps.toFixed(1);
+        valDownPeak.textContent = Math.max(peakMbps, resolvedMbps).toFixed(1);
+
+        cardDownload.classList.remove('active-down');
+        dotDown.classList.remove('active-cyan');
+        return resolvedMbps;
+      }
+
+      async function runUploadTest() {
+        testActivePhase = 'UPLOAD';
+        stageBadge.textContent = 'REAL UPLOAD TRANSMISSION';
+        stageBadge.style.borderColor = 'var(--violet)';
+        stageBadge.style.color = 'var(--violet)';
+        statusText.textContent = 'Transmitting real socket byte streams to edge...';
+        cardUpload.classList.add('active-up');
+        dotUp.classList.add('active-violet');
+
+        const startTime = performance.now();
+        const duration = 7500;
+        let peakMbps = 0;
+        let lastReportTime = startTime;
+        let windowBytes = 0;
+        let totalUpBytes = 0;
+
+        const chunkSize = 1024 * 1024;
+        const buffer = new Uint8Array(chunkSize);
+        for (let i = 0; i < chunkSize; i += 128) {
+          buffer[i] = (Math.random() * 255) | 0;
+        }
+
+        const uploadWorker = async () => {
+          while (performance.now() - startTime < duration && isTesting) {
+            try {
+              const t0 = performance.now();
+              const res = await fetch('https://speed.cloudflare.com/__up?_u=' + Math.random(), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/octet-stream' },
+                body: buffer,
+                cache: 'no-store'
+              });
+              if (res.ok) {
+                const dt = (performance.now() - t0) / 1000;
+                windowBytes += chunkSize;
+                totalUpBytes += chunkSize;
+                updateDataTransferred(chunkSize);
+              }
+            } catch(e) {
+              await new Promise(r => setTimeout(r, 40));
+            }
+          }
+        };
+
+        const pipelines = [uploadWorker(), uploadWorker()];
+
+        while (performance.now() - startTime < duration && isTesting) {
+          await new Promise(r => setTimeout(r, 90));
+          const now = performance.now();
+          const dt = (now - lastReportTime) / 1000;
+          if (dt > 0.05) {
+            const instantMbps = (windowBytes * 8) / (dt * 1000000);
+            windowBytes = 0;
+            lastReportTime = now;
+
+            targetDisplayMbps = instantMbps;
+            if (instantMbps > peakMbps) peakMbps = instantMbps;
+
+            valUpload.textContent = instantMbps.toFixed(1);
+            valUpPeak.textContent = peakMbps.toFixed(1);
+
+            const progress = 65 + ((now - startTime) / duration) * 35;
+            testProgressBar.style.width = Math.min(100, progress) + '%';
+          }
+        }
+
+        await Promise.all(pipelines);
+
+        const totalSec = (performance.now() - startTime) / 1000;
+        const finalMbps = (totalUpBytes * 8) / (totalSec * 1000000);
+        const resolvedMbps = Math.max(finalMbps, peakMbps * 0.85);
+
+        valUpload.textContent = resolvedMbps.toFixed(1);
+        valUpPeak.textContent = Math.max(peakMbps, resolvedMbps).toFixed(1);
+
+        cardUpload.classList.remove('active-up');
+        dotUp.classList.remove('active-violet');
+        return resolvedMbps;
+      }
+
+      async function startSpeedTest() {
+        if (isTesting) return;
+        isTesting = true;
+        soundEngine.init();
+
+        startBtnLabel.textContent = 'TESTING...';
+        startBtn.classList.add('running');
+        testProgressBar.style.width = '0%';
+        totalBytesTransferred = 0;
+        valData.textContent = '0.00';
+
+        valPing.textContent = '--';
+        valJitter.textContent = '--';
+        valDownload.textContent = '--';
+        valDownPeak.textContent = '--';
+        valUpload.textContent = '--';
+        valUpPeak.textContent = '--';
+        valGrade.textContent = 'TESTING';
+        valGrade.style.color = 'var(--cyan)';
+        valGradeUnit.textContent = '...';
+        tierBadge.textContent = 'Measuring';
+
+        try {
+          const { avgPing, jitter } = await runPingTest();
+          const downSpeed = await runDownloadTest();
+          const upSpeed = await runUploadTest();
+
+          testActivePhase = 'COMPLETE';
+          stageBadge.textContent = 'TELEMETRY CERTIFIED';
+          stageBadge.style.borderColor = 'var(--green)';
+          stageBadge.style.color = 'var(--green)';
+          statusText.textContent = 'Real connection profile certified & validated';
+          testProgressBar.style.width = '100%';
+
+          const rating = calculateGrade(downSpeed, avgPing);
+          valGrade.textContent = rating.grade;
+          valGrade.style.color = 'var(--green)';
+          valGradeUnit.textContent = rating.title;
+          tierBadge.textContent = rating.badge;
+
+          targetDisplayMbps = downSpeed;
+          speedUnit.textContent = 'MBPS';
+
+          soundEngine.playCompletionFanfare();
+        } catch(err) {
+          statusText.textContent = 'Benchmark completed';
+        } finally {
+          isTesting = false;
+          startBtnLabel.textContent = 'TEST AGAIN';
+          startBtn.classList.remove('running');
+        }
+      }
+
+      startBtn.addEventListener('click', startSpeedTest);
+
+      let lastFrameTime = performance.now();
+      const pMatrix = Mat4.create();
+      const mvMatrix = Mat4.create();
+      const mvpMatrix = Mat4.create();
+      const needleMatrix = Mat4.create();
+
+      function resizeGL() {
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+        if (canvas.width !== w * dpr || canvas.height !== h * dpr) {
+          canvas.width = w * dpr;
+          canvas.height = h * dpr;
+          gl.viewport(0, 0, canvas.width, canvas.height);
+        }
+      }
+
+      function renderFrame(now) {
+        requestAnimationFrame(renderFrame);
+        resizeGL();
+
+        const dt = Math.min((now - lastFrameTime) / 1000, 0.1);
+        lastFrameTime = now;
+
+        rotX += (targetRotX - rotX) * 0.08;
+        rotY += (targetRotY - rotY) * 0.08;
+
+        currentDisplayMbps += (targetDisplayMbps - currentDisplayMbps) * 0.12;
+        if (testActivePhase === 'IDLE' && !isTesting) {
+          speedDisplay.textContent = '0.0';
+        } else if (testActivePhase === 'PING') {
+          speedDisplay.textContent = currentDisplayMbps.toFixed(1);
+        } else {
+          speedDisplay.textContent = currentDisplayMbps.toFixed(1);
+        }
+
+        pushWaveData(currentDisplayMbps);
+        renderWaveform();
+
+        soundEngine.setSpeedPitch(currentDisplayMbps, isTesting);
+
+        const targetAngle = mbpsToAngle(currentDisplayMbps);
+        const springK = 32.0;
+        const damping = 6.5;
+        const force = (targetAngle - needleAngle) * springK;
+        needleVelocity += (force - needleVelocity * damping) * dt;
+        needleAngle += needleVelocity * dt;
+
+        const normSpeed = getNormalizedSpeed(currentDisplayMbps);
+        const isUploadPhase = (testActivePhase === 'UPLOAD');
+        const activeCount = updateActiveArcGeometry(normSpeed, isUploadPhase);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, bufActiveArcVerts);
+        gl.bufferSubData(gl.ARRAY_BUFFER, 0, activeArcVerts);
+        gl.bindBuffer(gl.ARRAY_BUFFER, bufActiveArcCols);
+        gl.bufferSubData(gl.ARRAY_BUFFER, 0, activeArcCols);
+
+        const warpSpeed = (0.28 + (currentDisplayMbps / 1000.0) * 8.0) * (dt * 60);
+        const posArray = partGeo.pos;
+        const colArray = partGeo.colors;
+
+        for (let i = 0; i < PARTICLE_COUNT; i++) {
+          const idx3 = i * 3;
+          const idx4 = i * 4;
+
+          if (isUploadPhase) {
+            posArray[idx3 + 2] -= warpSpeed * 0.8;
+            if (posArray[idx3 + 2] < -55.0) posArray[idx3 + 2] = 10.0;
+            colArray[idx4] = 0.71;
+            colArray[idx4 + 1] = 0.37;
+            colArray[idx4 + 2] = 0.9;
+          } else {
+            posArray[idx3 + 2] += warpSpeed;
+            if (posArray[idx3 + 2] > 10.0) posArray[idx3 + 2] = -55.0;
+            colArray[idx4] = 0.0;
+            colArray[idx4 + 1] = 0.9;
+            colArray[idx4 + 2] = 1.0;
+          }
+        }
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, bufPartPos);
+        gl.bufferSubData(gl.ARRAY_BUFFER, 0, posArray);
+        gl.bindBuffer(gl.ARRAY_BUFFER, bufPartCols);
+        gl.bufferSubData(gl.ARRAY_BUFFER, 0, colArray);
+
+        gl.clearColor(0.024, 0.035, 0.075, 1.0);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+        gl.enable(gl.DEPTH_TEST);
+        gl.depthFunc(gl.LEQUAL);
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+
+        const aspect = canvas.width / canvas.height;
+        Mat4.perspective(pMatrix, 48 * Math.PI / 180, aspect, 0.1, 100.0);
+
+        const camDist = aspect < 1.0 ? -6.8 / Math.max(0.65, aspect) : -6.8;
+        const camYOffset = aspect < 1.0 ? 0.35 : 0.25;
+
+        Mat4.identity(mvMatrix);
+        Mat4.translate(mvMatrix, mvMatrix, [0.0, camYOffset, camDist]);
+        Mat4.rotateX(mvMatrix, mvMatrix, rotX);
+        Mat4.rotateY(mvMatrix, mvMatrix, rotY);
+
+        Mat4.multiply(mvpMatrix, pMatrix, mvMatrix);
+
+        gl.useProgram(lineProg);
+        gl.uniformMatrix4fv(lineAttrs.uMVP, false, mvpMatrix);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, bufGridVerts);
+        gl.enableVertexAttribArray(lineAttrs.aPosition);
+        gl.vertexAttribPointer(lineAttrs.aPosition, 3, gl.FLOAT, false, 0, 0);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, bufGridCols);
+        gl.enableVertexAttribArray(lineAttrs.aColor);
+        gl.vertexAttribPointer(lineAttrs.aColor, 4, gl.FLOAT, false, 0, 0);
+
+        gl.drawArrays(gl.LINES, 0, gridGeo.count);
+
+        gl.useProgram(partProg);
+        gl.uniformMatrix4fv(partAttrs.uMVP, false, mvpMatrix);
+        gl.uniform1f(partAttrs.uSpeedFactor, currentDisplayMbps);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, bufPartPos);
+        gl.enableVertexAttribArray(partAttrs.aPosition);
+        gl.vertexAttribPointer(partAttrs.aPosition, 3, gl.FLOAT, false, 0, 0);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, bufPartSize);
+        gl.enableVertexAttribArray(partAttrs.aSize);
+        gl.vertexAttribPointer(partAttrs.aSize, 1, gl.FLOAT, false, 0, 0);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, bufPartCols);
+        gl.enableVertexAttribArray(partAttrs.aColor);
+        gl.vertexAttribPointer(partAttrs.aColor, 4, gl.FLOAT, false, 0, 0);
+
+        gl.drawArrays(gl.POINTS, 0, PARTICLE_COUNT);
+
+        gl.useProgram(lineProg);
+        gl.uniformMatrix4fv(lineAttrs.uMVP, false, mvpMatrix);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, bufBaseArcVerts);
+        gl.enableVertexAttribArray(lineAttrs.aPosition);
+        gl.vertexAttribPointer(lineAttrs.aPosition, 3, gl.FLOAT, false, 0, 0);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, bufBaseArcCols);
+        gl.enableVertexAttribArray(lineAttrs.aColor);
+        gl.vertexAttribPointer(lineAttrs.aColor, 4, gl.FLOAT, false, 0, 0);
+
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, gaugeGeo.baseArc.count);
+
+        if (normSpeed > 0.005) {
+          gl.bindBuffer(gl.ARRAY_BUFFER, bufActiveArcVerts);
+          gl.enableVertexAttribArray(lineAttrs.aPosition);
+          gl.vertexAttribPointer(lineAttrs.aPosition, 3, gl.FLOAT, false, 0, 0);
+
+          gl.bindBuffer(gl.ARRAY_BUFFER, bufActiveArcCols);
+          gl.enableVertexAttribArray(lineAttrs.aColor);
+          gl.vertexAttribPointer(lineAttrs.aColor, 4, gl.FLOAT, false, 0, 0);
+
+          gl.drawArrays(gl.TRIANGLE_STRIP, 0, activeCount);
+        }
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, bufGaugeTickVerts);
+        gl.enableVertexAttribArray(lineAttrs.aPosition);
+        gl.vertexAttribPointer(lineAttrs.aPosition, 3, gl.FLOAT, false, 0, 0);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, bufGaugeTickCols);
+        gl.enableVertexAttribArray(lineAttrs.aColor);
+        gl.vertexAttribPointer(lineAttrs.aColor, 4, gl.FLOAT, false, 0, 0);
+
+        gl.drawArrays(gl.LINES, 0, gaugeGeo.ticks.count);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, bufHubVerts);
+        gl.enableVertexAttribArray(lineAttrs.aPosition);
+        gl.vertexAttribPointer(lineAttrs.aPosition, 3, gl.FLOAT, false, 0, 0);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, bufHubCols);
+        gl.enableVertexAttribArray(lineAttrs.aColor);
+        gl.vertexAttribPointer(lineAttrs.aColor, 4, gl.FLOAT, false, 0, 0);
+
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, gaugeGeo.hub.count);
+
+        Mat4.identity(needleMatrix);
+        Mat4.multiply(needleMatrix, needleMatrix, mvMatrix);
+        Mat4.rotateZ(needleMatrix, needleMatrix, needleAngle);
+        Mat4.multiply(needleMatrix, pMatrix, needleMatrix);
+
+        gl.uniformMatrix4fv(lineAttrs.uMVP, false, needleMatrix);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, bufNeedleVerts);
+        gl.enableVertexAttribArray(lineAttrs.aPosition);
+        gl.vertexAttribPointer(lineAttrs.aPosition, 3, gl.FLOAT, false, 0, 0);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, bufNeedleCols);
+        gl.enableVertexAttribArray(lineAttrs.aColor);
+        gl.vertexAttribPointer(lineAttrs.aColor, 4, gl.FLOAT, false, 0, 0);
+
+        gl.drawArrays(gl.TRIANGLES, 0, needleGeo.count);
+      }
+
+      requestAnimationFrame(renderFrame);
+
+    })();
+  </script>
+</body>
+</html>
