@@ -43,7 +43,6 @@ Contains **zero third-party speed test APIs**, **zero external JavaScript librar
 ## File Structure
 
 ```
-d:/ABC/hkkl/
 ├── index.html     # Complete self-contained single-page application (HTML5, CSS3, WebGL JS)
 └── README.md      # Project documentation and technical overview
 ```
