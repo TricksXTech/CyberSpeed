@@ -4,6 +4,8 @@ A futuristic, standalone, single-page 3D web application built with pure HTML5, 
 
 Contains **zero third-party speed test APIs**, **zero external JavaScript libraries/CDNs**, and **zero tracking scripts**. Everything runs autonomously directly in the browser.
 
+[Demo Website](https://tricksxtech.github.io/CyberSpeed/)
+
 ---
 
 ## Features
